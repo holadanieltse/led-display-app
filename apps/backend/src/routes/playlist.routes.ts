@@ -1,7 +1,7 @@
 // 播放列表路由：Playlist CRUD + PlaylistItem CRUD + 权限控制（按 Display → orgId 隔离）
 import { Router, type Request, type Response, type NextFunction } from 'express'
 import { z } from 'zod'
-import { UserRole, PlaylistItemType, ScheduleType } from '@prisma/client'
+import { Prisma, UserRole, PlaylistItemType, ScheduleType } from '@prisma/client'
 import { prisma } from '../utils/prisma'
 import { requireAuth, requireRole } from '../middleware/auth'
 import { AppError } from '../middleware/errorHandler'
@@ -240,7 +240,7 @@ router.post('/playlists/:playlistId/items', requireAuth, requireRole(UserRole.SU
         icon: data.icon ?? null,
         content: data.content ?? null,
         mediaUrl: data.mediaUrl ?? null,
-        config: data.config ?? null,
+        config: data.config == null ? Prisma.DbNull : (data.config as Prisma.InputJsonValue),
         displayOrder: data.displayOrder,
         scheduleType: data.scheduleType,
         startTime: data.startTime ?? null,
@@ -329,7 +329,7 @@ router.post('/playlists/:playlistId/items/:itemId/duplicate', requireAuth, requi
         icon: existing.icon,
         content: existing.content,
         mediaUrl: existing.mediaUrl,
-        config: existing.config,
+        config: existing.config == null ? Prisma.DbNull : (existing.config as Prisma.InputJsonValue),
         displayOrder: existing.displayOrder + 1,
         scheduleType: existing.scheduleType,
         startTime: existing.startTime,
