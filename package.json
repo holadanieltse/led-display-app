@@ -1,0 +1,20 @@
+{
+  "name": "led-display-app",
+  "version": "0.1.0",
+  "private": true,
+  "description": "LED Display Management Web App (React + Vite + Tailwind / Node.js + Express + TS / Prisma + PostgreSQL)",
+  "scripts": {
+    "dev": "concurrently -n BACK,FRONT -c blue.bold,green.bold \"npm:dev:backend\" \"npm:dev:frontend\"",
+    "dev:backend": "npm --prefix apps/backend run dev",
+    "dev:frontend": "npm --prefix apps/frontend run dev",
+    "db:setup": "npm --prefix apps/backend run db:setup",
+    "db:studio": "npm --prefix apps/backend run prisma:studio",
+    "build": "npm --prefix apps/backend run build && npm --prefix apps/frontend run build"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

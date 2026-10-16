@@ -1,0 +1,194 @@
+// apps/backend/prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== 认证 & 多租户 ====================
+
+enum UserRole {
+  SUPER_ADMIN
+  ORG_OWNER
+  ORG_ADMIN
+  USER
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String?
+  password  String
+  role      UserRole @default(USER)
+  orgId     String
+  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orgId])
+  @@index([email])
+}
+
+model Organization {
+  id                  String   @id @default(uuid())
+  name                String
+  primaryContactName  String?
+  primaryContactEmail String?
+  users               User[]
+  displays            Display[]
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([name])
+}
+
+// ==================== 显示屏核心 ====================
+
+enum DisplayType {
+  TICKER
+  DIGITAL
+  HTML_FEED
+}
+
+enum DisplayStatus {
+  ONLINE
+  OFFLINE
+  ERROR
+}
+
+model Display {
+  id                String        @id @default(uuid())
+  name              String
+  macAddress        String        @unique
+  signId            String?
+  firmwareVersion   String?
+  tickerHeight      Int?
+  type              DisplayType   @default(TICKER)
+  status            DisplayStatus @default(OFFLINE)
+  lastSeenAt        DateTime?
+
+  timezone          String        @default("UTC")
+  timezoneRegion    String?
+  scrollSpeed       Int           @default(50)
+  brightness        Int           @default(50)
+  powerSaveEnabled  Boolean       @default(true)
+  tickerOnTime      String        @default("07:30")
+  tickerOffTime     String        @default("22:00")
+  scheduledClearRepublish String?
+
+  isDemo            Boolean       @default(false)
+  isPendingInstall  Boolean       @default(false)
+  clearCacheNext    Boolean       @default(false)
+
+  orgId             String
+  org               Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  subscriptions     DisplaySubscription[]
+  playlists         Playlist[]
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([orgId])
+  @@index([status])
+  @@index([macAddress])
+}
+
+// ==================== 订阅 ====================
+
+model SubscriptionPlan {
+  code        String  @id
+  name        String
+  description String?
+  priceMonthly Decimal? @db.Decimal(10, 2)
+  priceYearly  Decimal? @db.Decimal(10, 2)
+  displays     DisplaySubscription[]
+}
+
+model DisplaySubscription {
+  id          String   @id @default(uuid())
+  displayId   String
+  planCode    String
+  startDate   DateTime
+  endDate     DateTime?
+  isPerpetual Boolean  @default(false)
+  autoRenew   Boolean  @default(false)
+
+  display     Display          @relation(fields: [displayId], references: [id], onDelete: Cascade)
+  plan        SubscriptionPlan @relation(fields: [planCode], references: [code])
+
+  @@unique([displayId, planCode])
+  @@index([displayId])
+  @@index([planCode])
+}
+
+// ==================== 播放列表 ====================
+
+enum PlaylistItemType {
+  RSS              // 保留：兼容老数据
+  CUSTOM_TEXT      // 保留：兼容老数据
+  HTML             // 保留：兼容老数据
+  IMAGE            // 保留：兼容老数据
+  VIDEO            // 保留：兼容老数据
+  MESSAGE          // 新增：文字消息
+  RSS_FEED         // 新增：RSS Feed
+  FINANCIAL_QUOTES // 新增：股票/行情（Stocks feed）
+  SPORTS_SCORES    // 新增：体育比分（Sports feed）
+  WATCHLIST        // 新增：自选股/关注列表
+  CUSTOM_CONTENT   // 新增：自定义内容
+  GOOGLE_SHEETS    // 新增：Google Sheets
+  NEWSROOM         // 新增：新闻稿
+}
+
+enum ScheduleType {
+  ALWAYS
+  TIME_RANGE
+  DATE_RANGE
+  CUSTOM
+}
+
+model Playlist {
+  id            String   @id @default(uuid())
+  displayId     String
+  name          String   @default("Default Playlist")
+  lastUpdatedAt DateTime @default(now())
+  lastUpdatedBy String?
+  isPublished   Boolean  @default(false)
+  publishedAt   DateTime?
+
+  display       Display      @relation(fields: [displayId], references: [id], onDelete: Cascade)
+  items         PlaylistItem[]
+
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@index([displayId])
+}
+
+model PlaylistItem {
+  id            String         @id @default(uuid())
+  playlistId    String
+  itemType      PlaylistItemType
+  name          String         @default("")           // 显示名称，如 "MLB - Baseball"
+  icon          String?                                // 图标 emoji 或标识，如 ⚾ / 📈 / 📶
+  content       String?                                // 简单文本内容（MESSAGE / CUSTOM_TEXT 等）
+  mediaUrl      String?                                // 图片/视频 URL
+  config        Json?                                  // 类型特定配置（RSS / Financial / Sports / Sheets 等复杂结构）
+  displayOrder  Int            @default(0)
+  scheduleType  ScheduleType   @default(ALWAYS)
+  startTime     String?
+  endTime       String?
+  startDate     DateTime?
+  endDate       DateTime?
+  weekdays      String?
+
+  playlist      Playlist       @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@index([playlistId])
+}
